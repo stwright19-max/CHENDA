@@ -57,7 +57,7 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { ProviderFilter } from "@/components/provider-filter"
 import { PrintSchedule } from "@/components/print-schedule"
-import { BLOCK_SCHEDULE, ROOM_CONFIGS, DAYS_OF_WEEK, type Location } from "@/lib/block-schedule-data"
+import { ROOM_CONFIGS, DAYS_OF_WEEK, getScheduleForDate, getWeekOfMonth, type Location } from "@/lib/block-schedule-data"
 import { formatClinicSlotsForExport, exportToCSV } from "@/lib/export-utils" // Import missing functions
 
 export default function ProviderSchedulePage() {
@@ -585,7 +585,7 @@ export default function ProviderSchedulePage() {
 
       {/* Block Schedule View or Clinic Schedule */}
       {showBlockSchedule ? (
-        <BlockScheduleView location={selectedLocation as Location} />
+        <BlockScheduleView location={selectedLocation as Location} selectedDate={currentDate} />
       ) : loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -863,11 +863,14 @@ function ClinicSessionCard({
 }
 
 // Block Schedule View Component
-function BlockScheduleView({ location }: { location: Location }) {
+function BlockScheduleView({ location, selectedDate }: { location: Location; selectedDate: Date }) {
   const rooms = ROOM_CONFIGS[location] || []
   
+  // Get the week number and schedule data for the selected date
+  const { weekNumber, entries } = getScheduleForDate(selectedDate)
+  
   // Get entries for this location
-  const locationEntries = BLOCK_SCHEDULE.entries.filter(
+  const locationEntries = entries.filter(
     (entry) => entry.location === location
   )
 
@@ -905,8 +908,11 @@ function BlockScheduleView({ location }: { location: Location }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Grid3X3 className="h-5 w-5" />
-          Week 1 Block Schedule - {location}
+          Week {weekNumber} Block Schedule - {location}
         </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Based on {format(selectedDate, "MMMM d, yyyy")} (Week {weekNumber} of the month)
+        </p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
