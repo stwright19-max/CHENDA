@@ -1,7 +1,5 @@
 "use client"
 
-import React from "react"
-
 import { useState, useEffect } from "react"
 import { format, addDays, parseISO } from "date-fns"
 import {
@@ -19,13 +17,10 @@ import {
   RefreshCw,
   Printer,
   Download,
-  Grid3X3,
-  List,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -57,8 +52,7 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { ProviderFilter } from "@/components/provider-filter"
 import { PrintSchedule } from "@/components/print-schedule"
-import { ROOM_CONFIGS, DAYS_OF_WEEK, getScheduleForDate, getWeekOfMonth, type Location } from "@/lib/block-schedule-data"
-import { formatClinicSlotsForExport, exportToCSV } from "@/lib/export-utils" // Import missing functions
+import { formatClinicSlotsForExport, exportToCSV } from "@/lib/export-utils"
 
 export default function ProviderSchedulePage() {
   const [clinicSlots, setClinicSlots] = useState<any[]>([])
@@ -80,7 +74,6 @@ export default function ProviderSchedulePage() {
   const [selectedProviderFilter, setSelectedProviderFilter] = useState<string | null>(null)
   const [showPrintView, setShowPrintView] = useState(false)
   const [rawData, setRawData] = useState<any[]>([])
-  const [showBlockSchedule, setShowBlockSchedule] = useState(false)
 
   // Get providers, MAs, and coordinators
   const providers = getProviders()
@@ -449,17 +442,8 @@ export default function ProviderSchedulePage() {
           <div className="text-muted-foreground">View and manage clinic schedules and room assignments</div>
         </div>
 
-        {/* Update the buttons in the header section to include an Export button */}
+        {/* Header buttons */}
         <div className="mt-4 sm:mt-0 flex gap-2 flex-wrap">
-          <Button 
-            variant={showBlockSchedule ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setShowBlockSchedule(!showBlockSchedule)}
-            className={showBlockSchedule ? "" : "bg-transparent"}
-          >
-            {showBlockSchedule ? <List className="mr-2 h-4 w-4" /> : <Grid3X3 className="mr-2 h-4 w-4" />}
-            {showBlockSchedule ? "Daily View" : "Block Schedule"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowPrintView(true)} className="bg-transparent">
             <Printer className="mr-2 h-4 w-4" />
             Print View
@@ -474,7 +458,7 @@ export default function ProviderSchedulePage() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowRoomAvailability(!showRoomAvailability)} className="bg-transparent">
             <DoorOpen className="mr-2 h-4 w-4" />
-            {showRoomAvailability ? "Hide Room Calendar" : "View Room Calendar"}
+            {showRoomAvailability ? "Hide Block Schedule" : "Block Schedule"}
           </Button>
         </div>
       </div>
@@ -537,23 +521,13 @@ export default function ProviderSchedulePage() {
         </div>
       </div>
 
-      {/* Room Availability Calendar */}
+      {/* Room Availability Calendar with Block Schedule */}
       {showRoomAvailability && (
         <div className="mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Room Availability - {selectedLocation}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RoomAvailabilityCalendar
-                location={selectedLocation}
-                date={currentDate}
-                rooms={roomsByLocation[selectedLocation as keyof typeof roomsByLocation] || []}
-                schedule={clinicSlots}
-                onRequestSlot={handleRequestSlot}
-              />
-            </CardContent>
-          </Card>
+          <RoomAvailabilityCalendar
+            location={selectedLocation}
+            date={currentDate}
+          />
         </div>
       )}
 
@@ -583,10 +557,8 @@ export default function ProviderSchedulePage() {
         </Card>
       )}
 
-      {/* Block Schedule View or Clinic Schedule */}
-      {showBlockSchedule ? (
-        <BlockScheduleView location={selectedLocation as Location} selectedDate={currentDate} />
-      ) : loading ? (
+      {/* Clinic Schedule */}
+      {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2">Loading provider schedules...</span>
@@ -858,132 +830,6 @@ function ClinicSessionCard({
           </Button>
         )}
       </CardFooter>
-    </Card>
-  )
-}
-
-// Block Schedule View Component
-function BlockScheduleView({ location, selectedDate }: { location: Location; selectedDate: Date }) {
-  const rooms = ROOM_CONFIGS[location] || []
-  
-  // Get the week number and schedule data for the selected date
-  const { weekNumber, entries } = getScheduleForDate(selectedDate)
-  
-  // Get entries for this location
-  const locationEntries = entries.filter(
-    (entry) => entry.location === location
-  )
-
-  // Helper to get provider for a specific room, day, and block
-  const getProvider = (room: string, day: string, block: "AM" | "PM") => {
-    const entry = locationEntries.find(
-      (e) => e.dayOfWeek === day && e.block === block
-    )
-    return entry?.rooms[room] || ""
-  }
-
-  // Helper to get cell styling based on provider
-  const getCellStyle = (provider: string) => {
-    if (provider === "Open") {
-      return "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-dashed"
-    }
-    if (provider === "N/A") {
-      return "bg-muted/50 text-muted-foreground"
-    }
-    return "bg-background"
-  }
-
-  if (rooms.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
-          No rooms configured for {location}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Grid3X3 className="h-5 w-5" />
-          Week {weekNumber} Block Schedule - {location}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Based on {format(selectedDate, "MMMM d, yyyy")} (Week {weekNumber} of the month)
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px] font-semibold">Room</TableHead>
-                {DAYS_OF_WEEK.map((day) => (
-                  <TableHead key={day} className="text-center min-w-[140px]" colSpan={2}>
-                    {day}
-                  </TableHead>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableHead />
-                {DAYS_OF_WEEK.map((day) => (
-                  <React.Fragment key={`${day}-header`}>
-                    <TableHead className="text-center text-xs font-medium text-muted-foreground">
-                      AM
-                    </TableHead>
-                    <TableHead className="text-center text-xs font-medium text-muted-foreground">
-                      PM
-                    </TableHead>
-                  </React.Fragment>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rooms.map((room) => (
-                <TableRow key={room}>
-                  <TableCell className="font-medium text-sm whitespace-nowrap">
-                    {room}
-                  </TableCell>
-                  {DAYS_OF_WEEK.map((day) => (
-                    <React.Fragment key={`${room}-${day}`}>
-                      <TableCell
-                        className={cn(
-                          "text-center text-sm border-l p-2",
-                          getCellStyle(getProvider(room, day, "AM"))
-                        )}
-                      >
-                        {getProvider(room, day, "AM") || "-"}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-center text-sm p-2",
-                          getCellStyle(getProvider(room, day, "PM"))
-                        )}
-                      >
-                        {getProvider(room, day, "PM") || "-"}
-                      </TableCell>
-                    </React.Fragment>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        
-        {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-50 dark:bg-green-950/30 border border-dashed border-green-300 rounded" />
-            <span className="text-muted-foreground">Open - Available for booking</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-muted/50 border rounded" />
-            <span className="text-muted-foreground">N/A - Not available</span>
-          </div>
-        </div>
-      </CardContent>
     </Card>
   )
 }
